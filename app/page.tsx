@@ -1,57 +1,97 @@
-import { DeployButton } from "@/components/deploy-button";
-import { EnvVarWarning } from "@/components/env-var-warning";
-import { AuthButton } from "@/components/auth-button";
-import { Hero } from "@/components/hero";
-import { ThemeSwitcher } from "@/components/theme-switcher";
-import { ConnectSupabaseSteps } from "@/components/tutorial/connect-supabase-steps";
-import { SignUpUserSteps } from "@/components/tutorial/sign-up-user-steps";
-import { hasEnvVars } from "@/lib/utils";
-import Link from "next/link";
-import { Suspense } from "react";
+/**
+ * UX LAYER: This component handles the visual presentation and user interactions.
+ * It does NOT directly communicate with the database.
+ *
+ * Responsibilities:
+ * 1. Maintain local UI state (notes list, loading status, input value).
+ * 2. Render the UI (Input field, Buttons, List of notes).
+ * 3. Call the "Backend Service Layer" (lib/api/notes.ts) when user performs actions.
+ */
+"use client";
+
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { fetchNotes, createNote } from "@/lib/api/notes";
 
 export default function Home() {
+  const [notes, setNotes] = useState<any[]>([]);
+  const [newNote, setNewNote] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleLoad = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchNotes();
+      if (Array.isArray(data)) {
+        setNotes(data);
+      } else {
+        console.error("Failed to load notes:", data);
+        setNotes([]);
+      }
+    } catch (error) {
+      console.error("Error loading notes:", error);
+      setNotes([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!newNote.trim()) return;
+
+    try {
+      await createNote(newNote);
+      setNewNote("");
+      handleLoad(); // Reload notes after submission
+    } catch (error) {
+      console.error("Error submitting note:", error);
+      alert(`Failed to submit note: ${error}`);
+    }
+  };
+
   return (
-    <main className="min-h-screen flex flex-col items-center">
-      <div className="flex-1 w-full flex flex-col gap-20 items-center">
-        <nav className="w-full flex justify-center border-b border-b-foreground/10 h-16">
-          <div className="w-full max-w-5xl flex justify-between items-center p-3 px-5 text-sm">
-            <div className="flex gap-5 items-center font-semibold">
-              <Link href={"/"}>Next.js Supabase Starter</Link>
-              <div className="flex items-center gap-2">
-                <DeployButton />
-              </div>
-            </div>
-            {!hasEnvVars ? (
-              <EnvVarWarning />
-            ) : (
-              <Suspense>
-                <AuthButton />
-              </Suspense>
-            )}
-          </div>
-        </nav>
-        <div className="flex-1 flex flex-col gap-20 max-w-5xl p-5">
-          <Hero />
-          <main className="flex-1 flex flex-col gap-6 px-4">
-            <h2 className="font-medium text-xl mb-4">Next steps</h2>
-            {hasEnvVars ? <SignUpUserSteps /> : <ConnectSupabaseSteps />}
-          </main>
+    <main className="flex min-h-screen flex-col items-center justify-center bg-black text-white p-24">
+      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex flex-col gap-8">
+        <h1 className="text-4xl font-bold mb-8">Notes App</h1>
+
+        <div className="flex w-full max-w-sm items-center space-x-2">
+          <Input
+            type="text"
+            placeholder="Enter a note"
+            value={newNote}
+            onChange={(e) => setNewNote(e.target.value)}
+            className="text-black bg-white"
+          />
+          <Button onClick={handleSubmit} variant="secondary">
+            Submit
+          </Button>
         </div>
 
-        <footer className="w-full flex items-center justify-center border-t mx-auto text-center text-xs gap-8 py-16">
-          <p>
-            Powered by{" "}
-            <a
-              href="https://supabase.com/?utm_source=create-next-app&utm_medium=template&utm_term=nextjs"
-              target="_blank"
-              className="font-bold hover:underline"
-              rel="noreferrer"
-            >
-              Supabase
-            </a>
-          </p>
-          <ThemeSwitcher />
-        </footer>
+        <div className="flex flex-col gap-4 mt-8 w-full max-w-sm">
+          <Button
+            onClick={handleLoad}
+            disabled={loading}
+            variant="default"
+            className="w-full bg-slate-800 hover:bg-slate-700 text-white border border-slate-700"
+          >
+            {loading ? "Loading..." : "Load Notes"}
+          </Button>
+
+          <div className="mt-4 space-y-2 w-full">
+            {notes.length === 0 && !loading && (
+              <p className="text-center text-gray-500">No notes loaded.</p>
+            )}
+            {notes.map((note) => (
+              <div
+                key={note.id}
+                className="p-4 rounded border border-gray-800 bg-gray-900 w-full"
+              >
+                <p>{note.title || JSON.stringify(note)}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </main>
   );
